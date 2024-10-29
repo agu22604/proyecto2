@@ -1,0 +1,148 @@
+
+// Librerías 
+#include <Arduino.h>
+#include <HardwareSerial.h>
+#include "Wire.h"
+#include <ESP32SPISlave.h>
+
+// variables globales
+// Potenciómetros
+#define P1 36
+
+
+// Se define el puerto serial a utilizar para la comunicación UART
+
+// variables parte 2
+float voltaje; 
+//variables parte 1
+#define QUEUE_SIZE 1
+ESP32SPISlave slave;
+
+static constexpr size_t BUFFER_SIZE =8;
+uint8_t tx_buf[BUFFER_SIZE]{1,2,3,4,5,6,7,8};
+uint8_t rx_buf[BUFFER_SIZE]{0,0,0,0,0,0,0,0};
+char cmd, cmd1, cmd2,cmd3,cmd4,cmd5 [5];
+
+//Se define I2C
+#define I2C_DEV_ADDR 0x55
+#define LED1 26
+#define LED2 33
+#define LED3 32
+uint8_t i=0;
+
+void onRequest();
+void onReceive (int len);
+
+
+void setup() {
+  // inicia la conexión serial con la comptadora
+  Serial.begin(115200);
+  delay(2000);
+  // Se configura el UART
+  // Se define el funcionamiento de los potenciómetros
+  pinMode(P1,INPUT); 
+  
+
+
+  //I2C
+  Serial.setDebugOutput(true);
+  pinMode(LED1,OUTPUT);
+  pinMode(LED2,OUTPUT);
+  pinMode(LED3,OUTPUT);
+
+  Wire.onReceive(onReceive);
+  Wire.onRequest(onRequest);
+  Wire.begin((uint8_t)I2C_DEV_ADDR);
+
+  //parte 1
+  slave.setDataMode(SPI_MODE0);
+  slave.setQueueSize(QUEUE_SIZE);
+  slave.begin(VSPI);
+
+
+
+}
+
+void loop() {
+  // Lee el valor de los potenciómetros
+
+  int s1=analogRead(P1);
+  int P_1 = map(s1, 0, 4095, 0, 400);
+  // Muestra los valores en la pantalla serial
+   voltaje = analogReadMilliVolts(P1) / 1000.0; 
+   Serial.println(voltaje);
+   delay(1000);
+
+
+
+  //spi no bloqueante
+  if (slave.hasTransactionsCompletedAndAllResultsHandled()){
+    slave.queue(NULL,rx_buf,BUFFER_SIZE);
+    slave.trigger();
+  }
+
+  if (slave.hasTransactionsCompletedAndAllResultsReady(QUEUE_SIZE)){
+    Serial.println("all queued transactions completed. start verifying");
+    size_t received_byte=slave.numBytesReceived();
+    cmd=rx_buf[0];
+    Serial.println(cmd);
+    
+     if(cmd=='1'){
+      Serial.println("Setting LED active HIGH "),
+      digitalWrite(LED1,HIGH);
+      delay(5000);
+      cmd=' ';
+      
+    }
+    
+     if(cmd=='2'){
+      Serial.println("Setting LED active HIGH "),
+      digitalWrite(LED2,HIGH);
+      delay(5000);
+      cmd=' ';
+      
+    }
+
+     if(cmd=='3'){
+      Serial.println("Setting LED active HIGH "),
+      digitalWrite(LED3,HIGH);
+      delay(5000);
+      cmd=' ';
+      
+    }
+    digitalWrite(LED1,LOW);
+    digitalWrite(LED2,LOW);
+    digitalWrite(LED3,LOW);
+    
+  }
+ 
+  
+}
+
+
+
+void onRequest(){
+  // Lee el valor analógico del potenciómetro
+  unsigned int Pot = analogRead(P1);
+  Wire.print(Pot);
+  // Imprime en el monitor serial para saber que valor se está enviando
+  Serial.print("onRequest:");
+  Serial.println(numero);
+}
+
+void onReceive(int len){
+  Serial.printf("onReceive[%d]:",len);
+  while(Wire.available()){
+    uint8_t incomingByte =Wire.read();
+    Serial.write(incomingByte);
+
+    if(incomingByte == 'S'){
+      digitalWrite(LED1,HIGH);
+    }else{
+      digitalWrite(LED1,LOW);
+    }
+  }
+ 
+}
+
+
