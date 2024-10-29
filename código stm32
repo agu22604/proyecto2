@@ -1,0 +1,71 @@
+// Se incluyen las librerías necesarias
+#include <Arduino.h>        // Biblioteca principal de Arduino
+#include <HardwareSerial.h> // Biblioteca para la comunicación serial
+#include "Wire.h"          // Biblioteca para I2C
+#include <ESP32SPISlave.h> // Biblioteca para la comunicación SPI como esclavo
+
+// Definición de variables globales
+#define P1 36 // Pin del potenciómetro
+
+// Variables para el voltaje
+float voltaje; 
+
+// Variables para la comunicación SPI
+#define QUEUE_SIZE 1 // Tamaño de la cola para las transacciones SPI
+ESP32SPISlave slave; // Instancia de la clase ESP32SPISlave
+
+// Definición del tamaño del buffer
+static constexpr size_t BUFFER_SIZE = 8; // Tamaño del buffer
+uint8_t tx_buf[BUFFER_SIZE]{1,2,3,4,5,6,7,8}; // Buffer de transmisión
+uint8_t rx_buf[BUFFER_SIZE]{0,0,0,0,0,0,0,0}; // Buffer de recepción
+
+// Variables para los comandos
+char cmd, cmd1, cmd2, cmd3, cmd4, cmd5[5]; // Comandos de tipo char
+
+// Definiciones para I2C y pines de LED
+#define I2C_DEV_ADDR 0x55 // Dirección del dispositivo I2C
+#define LED1 26 // Pin para LED1
+#define LED2 33 // Pin para LED2
+#define LED3 32 // Pin para LED3
+
+// Funciones de manejo de solicitudes y recepción
+void onRequest();
+void onReceive(int len);
+
+// Función de configuración que se ejecuta una vez al iniciar
+void setup() {
+  // Inicia la conexión serial con la computadora
+  Serial.begin(115200); // Configura la velocidad de la conexión serial
+  delay(2000); // Espera 2 segundos
+
+  // Configura el pin del potenciómetro como entrada
+  pinMode(P1, INPUT); 
+
+  // Configura los LEDs como salida
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(LED3, OUTPUT);
+
+  // Configuración del I2C
+  Wire.onReceive(onReceive); // Define la función a llamar cuando se recibe un dato
+  Wire.onRequest(onRequest);  // Define la función a llamar cuando se solicita un dato
+  Wire.begin((uint8_t)I2C_DEV_ADDR); // Inicializa el I2C con la dirección del dispositivo
+
+  // Configuración del SPI
+  slave.setDataMode(SPI_MODE0); // Establece el modo de datos del SPI
+  slave.setQueueSize(QUEUE_SIZE); // Establece el tamaño de la cola
+  slave.begin(VSPI); // Inicia el SPI en el bus VSPI
+}
+
+// Función que se ejecuta en bucle
+void loop() {
+  // Lee el valor del potenciómetro
+  int s1 = analogRead(P1); // Lee el valor analógico del potenciómetro
+  int P_1 = map(s1, 0, 4095, 0, 400); // Mapea el valor del potenciómetro a un rango de 0 a 400
+  voltaje = analogReadMilliVolts(P1) / 1000.0; // Calcula el voltaje en voltios
+  Serial.println(voltaje); // Imprime el voltaje en el monitor serial
+  delay(1000); // Espera 1 segundo
+
+  // Manejo no bloqueante de SPI
+  if (slave.hasTransactionsCompletedAndAllResultsHandled()) {
+    slave.queue(NULL
